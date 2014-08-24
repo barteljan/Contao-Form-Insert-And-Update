@@ -1,0 +1,40 @@
+{
+   "name":"barteljan/contao-form-insert-and-update",
+   "description":"A contao module to insert and update or data in your database with a contao form.",
+   "keywords":[
+      "contao",
+      "form",
+      "insert",
+      "update",
+      "database"
+   ],
+   "type":"contao-module",
+   "homepage":"http://janbartel.de/",
+   "license":"BSD",
+   "authors":[
+      {
+         "name":"Jan Bartel",
+         "email":"barteljan@yahoo.de",
+         "homepage":"http://janbartel.de",
+         "role":"Developer"
+      }
+   ],
+   "support":{
+      "email":"barteljan@yahoo.de",
+      "issues":"https://github.com/barteljan/Contao-Form-Insert-And-Update/issues",
+      "wiki":"https://github.com/barteljan/Contao-Form-Insert-And-Update/wiki",
+      "source":"https://github.com/barteljan/Contao-Form-Insert-And-Update"
+   },
+   "require":{
+      "php":">=5.3",
+      "contao/core":">=2.11,<3.4",
+      "contao-community-alliance/composer-installer": "*"
+   },
+   "extra":{
+      "contao":{
+         "sources":{
+            "FormInsertAndUpdate":"system/modules/FormInsertAndUpdate"
+         }
+      }
+   }
+}
