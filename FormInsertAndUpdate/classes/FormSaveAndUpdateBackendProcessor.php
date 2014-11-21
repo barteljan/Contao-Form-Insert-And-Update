@@ -34,15 +34,18 @@ namespace jba\form\saveAndUpdate;
 class FormSaveAndUpdateBackendProcessor extends \Backend{
 
   public function getAllFields($dc_table){
-
       $table = $dc_table->activeRecord->storeAndUpdateTable;
 
-      $fields = $this->Database->listFields($table, true);
+      if(!empty($table)) {
 
-      $fieldList = array();
-      foreach($fields as $field){
-        $fieldList[] = $field['name'];
+          $fields = $this->Database->listFields($table, true);
+
+          $fieldList = array();
+          foreach ($fields as $field) {
+              $fieldList[] = $field['name'];
+          }
+          return $fieldList;
       }
-      return $fieldList;
+      return array();
   }
 }

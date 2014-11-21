@@ -30,8 +30,8 @@
  * @copyright Jan Bartel 2014
  */
 $GLOBALS['TL_DCA']['tl_form']['palettes']['__selector__'][] = 'storeAndUpdateValues';
-$GLOBALS['TL_DCA']['tl_form']['palettes']['default'] = str_replace('storeValues;','storeValues,storeAndUpdateValues;',$GLOBALS['TL_DCA']['tl_form']['palettes']['default']);
-$GLOBALS['TL_DCA']['tl_form']['subpalettes']['storeAndUpdateValues'] = 'storeAndUpdateTable,storeAndUpdateAlias';
+$GLOBALS['TL_DCA']['tl_form']['palettes']['default'] = str_replace('storeValues;','storeAndUpdateValues;',$GLOBALS['TL_DCA']['tl_form']['palettes']['default']);
+$GLOBALS['TL_DCA']['tl_form']['subpalettes']['storeAndUpdateValues'] = 'storeAndUpdateTable,storeAndUpdateAlias,storeAndUpdateEditPermissionField,member_insert_groups';
 
 $GLOBALS['TL_DCA']['tl_form']['fields']['storeAndUpdateValues'] = array(
   'label'                   => &$GLOBALS['TL_LANG']['tl_form']['storeAndUpdateValues'],
@@ -62,4 +62,26 @@ $GLOBALS['TL_DCA']['tl_form']['fields']['storeAndUpdateAlias'] = array
   'options_callback'        => array('jba\form\saveAndUpdate\FormSaveAndUpdateBackendProcessor', 'getAllFields'),
   'eval'                    => array('chosen'=>true),
   'sql'                     => "varchar(64) NOT NULL default ''"
+);
+
+$GLOBALS['TL_DCA']['tl_form']['fields']['storeAndUpdateEditPermissionField'] = array
+(
+    'label'                   => &$GLOBALS['TL_LANG']['tl_form']['storeAndUpdateEditPermissionField'],
+    'exclude'                 => true,
+    'search'                  => true,
+    'inputType'               => 'select',
+    'options_callback'        => array('jba\form\saveAndUpdate\FormSaveAndUpdateBackendProcessor', 'getAllFields'),
+    'eval'                    => array('chosen'=>true),
+    'sql'                     => "varchar(64) NOT NULL default ''"
+);
+
+$GLOBALS['TL_DCA']['tl_form']['fields']['member_insert_groups'] = array
+(
+    'label'                   => &$GLOBALS['TL_LANG']['tl_form']['member_insert_groups'],
+    'exclude'                 => true,
+    'inputType'               => 'checkbox',
+    'foreignKey'              => 'tl_member_group.name',
+    'eval'                    => array('mandatory'=>false, 'multiple'=>true),
+    'sql'                     => "blob NULL",
+    'relation'                => array('type'=>'hasMany', 'load'=>'lazy')
 );

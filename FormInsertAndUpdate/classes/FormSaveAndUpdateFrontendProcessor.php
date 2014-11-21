@@ -31,6 +31,9 @@
  */
 namespace jba\form\saveAndUpdate;
 
+use Contao\Database;
+use Contao\Messages;
+
 class FormSaveAndUpdateFrontendProcessor extends \Frontend{
 
   /**
@@ -55,6 +58,7 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend{
       $table = $arrForm['storeAndUpdateTable'];
       $alias = $arrForm['storeAndUpdateAlias'];
 
+      $this->import('FrontendUser','frontendUser');
       $this->import('Database','database');
 
       //check if table exists
@@ -72,15 +76,63 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend{
 
       //check if alias field exists
       if(!isset($dbFields[$alias])){
-        return;
+          \Message::addError($dbFields[$alias]." existiert nicht!");
+          return;
       }
 
       //check if we should insert or update
       if((is_string($arrSubmitted[$alias]) && strlen($arrSubmitted[$alias]) > 0) ||
           (is_numeric($arrSubmitted[$alias]) && double_val($arrSubmitted[$alias]) > 0)){
+
+          $aliasValue = (is_numeric($arrSubmitted[$alias])?intval($arrSubmitted[$alias]):preg_replace("/[^a-zA-Z0-9\-]+/", "", $arrSubmitted[$alias]));
+
+          /**
+           * @var Database $database
+           */
+          $database   = $this->database;
+
+          //check if we are allowed to update
+          if(!empty($arrForm["storeAndUpdateEditPermissionField"])){
+
+              //check if permission field exists
+              if(!isset($dbFields[$arrForm["storeAndUpdateEditPermissionField"]])) {
+                  \Message::addError($arrForm["storeAndUpdateEditPermissionField"] . " does not exist!");
+                  return;
+              }
+
+              $sql = "SELECT ".$arrForm["storeAndUpdateEditPermissionField"]." FROM ".$table." WHERE ".$alias." = ".$aliasValue;
+              echo $sql."<br>";
+              $result = $database->query($sql);
+
+              $row = $result->fetchAssoc();
+              $editPermissions = deserialize($row[$arrForm["storeAndUpdateEditPermissionField"]]);
+
+              if($editPermissions != null && !is_array($editPermissions)){
+                  \Message::addError($arrForm["storeAndUpdateEditPermissionField"] . " is of wrong type!");
+                  return;
+              }
+
+              $userGroups = \contao\FrontendUser::getInstance()->groups;
+              $allowedGroups = deserialize($editPermissions);
+
+              $allowed = false;
+
+              if(is_array($userGroups) && is_array($allowedGroups)){
+                  foreach($userGroups as $userGroup){
+                      if(in_array($userGroup,$allowedGroups)){
+                          $allowed = true;
+                      }
+                  }
+              }
+
+              if(!$allowed){
+                  \Message::addError("Access not allowed!");
+                  return;
+              }
+          }
+
           $this->update($table,$alias,$arrSubmitted,$alias);
       }else{
-          echo "INSERT";die;
           $this->insert($table,$alias,$arrSubmitted);
       }
   }
