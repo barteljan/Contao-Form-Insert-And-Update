@@ -31,21 +31,23 @@
  */
 namespace jba\form\saveAndUpdate;
 
-class FormSaveAndUpdateBackendProcessor extends \Backend{
+class FormSaveAndUpdateBackendProcessor extends \Backend
+{
 
-  public function getAllFields($dc_table){
-      $table = $dc_table->activeRecord->storeAndUpdateTable;
+    public function getAllFields($dc_table)
+    {
+        $table = $dc_table->activeRecord->storeAndUpdateTable;
 
-      if(!empty($table)) {
+        if (!empty($table)) {
 
-          $fields = $this->Database->listFields($table, true);
+            $fields = $this->Database->listFields($table, true);
 
-          $fieldList = array();
-          foreach ($fields as $field) {
-              $fieldList[] = $field['name'];
-          }
-          return $fieldList;
-      }
-      return array();
-  }
+            $fieldList = array();
+            foreach ($fields as $field) {
+                $fieldList[] = $field['name'];
+            }
+            return $fieldList;
+        }
+        return array();
+    }
 }

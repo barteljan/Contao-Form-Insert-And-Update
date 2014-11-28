@@ -33,191 +33,277 @@ namespace jba\form\saveAndUpdate;
 
 use Contao\Database;
 use Contao\Messages;
+use Contao\PageModel;
 
-class FormSaveAndUpdateFrontendProcessor extends \Frontend{
+class FormSaveAndUpdateFrontendProcessor extends \Frontend
+{
 
-  /**
-   * Process submitted form data
-   * Send mail, store data in backend
-   * @param array $arrSubmitted Submitted data
-   * @param array|bool $arrForm Form configuration
-   * @param array|bool $arrFiles Files uploaded
-   * @param array|bool $arrLabels Form field labels
-   * @return void
-   */
-  public function processSubmittedData($arrSubmitted, $arrForm=false, $arrFiles=false, $arrLabels=false) {
-
-      //check if we should storeAndUpdate this form
-      //check if table and alias are set
-      if(intval($arrForm['storeAndUpdateValues']) != 1 &&
-         strlen($arrForm['storeAndUpdateTable']) == 0 &&
-         strlen($arrForm['storeAndUpdateAlias']) == 0){
-           return;
-      }
-
-      $table = $arrForm['storeAndUpdateTable'];
-      $alias = $arrForm['storeAndUpdateAlias'];
-
-      $this->import('FrontendUser','frontendUser');
-      $this->import('Database','database');
-
-      //check if table exists
-      if(!$this->database->tableExists($table,null,true)){
-        return;
-      }
-
-      //read available database fields from db
-      $fieldList = $this->database->listFields($table,true);
-
-      $dbFields = array();
-      foreach($fieldList as $field){
-        $dbFields[$field['name']] = $field;
-      }
-
-      //check if alias field exists
-      if(!isset($dbFields[$alias])){
-          \Message::addError($dbFields[$alias]." existiert nicht!");
-          return;
-      }
-
-      //check if we should insert or update
-      if((is_string($arrSubmitted[$alias]) && strlen($arrSubmitted[$alias]) > 0) ||
-          (is_numeric($arrSubmitted[$alias]) && double_val($arrSubmitted[$alias]) > 0)){
-
-          $aliasValue = (is_numeric($arrSubmitted[$alias])?intval($arrSubmitted[$alias]):preg_replace("/[^a-zA-Z0-9\-]+/", "", $arrSubmitted[$alias]));
-
-          /**
-           * @var Database $database
-           */
-          $database   = $this->database;
-
-          //check if we are allowed to update
-          if(!empty($arrForm["storeAndUpdateEditPermissionField"])){
-
-              //check if permission field exists
-              if(!isset($dbFields[$arrForm["storeAndUpdateEditPermissionField"]])) {
-                  \Message::addError($arrForm["storeAndUpdateEditPermissionField"] . " does not exist!");
-                  return;
-              }
-
-              $sql = "SELECT ".$arrForm["storeAndUpdateEditPermissionField"]." FROM ".$table." WHERE ".$alias." = ".$aliasValue;
-              echo $sql."<br>";
-              $result = $database->query($sql);
-
-              $row = $result->fetchAssoc();
-              $editPermissions = deserialize($row[$arrForm["storeAndUpdateEditPermissionField"]]);
-
-              if($editPermissions != null && !is_array($editPermissions)){
-                  \Message::addError($arrForm["storeAndUpdateEditPermissionField"] . " is of wrong type!");
-                  return;
-              }
-
-              $userGroups = \contao\FrontendUser::getInstance()->groups;
-              $allowedGroups = deserialize($editPermissions);
-
-              $allowed = false;
-
-              if(is_array($userGroups) && is_array($allowedGroups)){
-                  foreach($userGroups as $userGroup){
-                      if(in_array($userGroup,$allowedGroups)){
-                          $allowed = true;
-                      }
-                  }
-              }
-
-              if(!$allowed){
-                  \Message::addError("Access not allowed!");
-                  return;
-              }
-          }
-
-          $this->update($table,$alias,$arrSubmitted,$alias);
-      }else{
-          $this->insert($table,$alias,$arrSubmitted);
-      }
-  }
-
-  protected function prepareDataArray($arrSubmitted,$table,$alias,$type){
-    $arrSet = array();
-
-    // Add the timestamp
-    if ($this->Database->fieldExists('tstamp', $table))
+    /**
+     * Process submitted form data
+     * Send mail, store data in backend
+     * @param array $arrSubmitted Submitted data
+     * @param array|bool $arrForm Form configuration
+     * @param array|bool $arrFiles Files uploaded
+     * @param array|bool $arrLabels Form field labels
+     * @return void
+     */
+    public function processSubmittedData($arrSubmitted, $arrForm = false, $arrFiles = false, $arrLabels = false, $form = null)
     {
-      $arrSet['tstamp'] = time();
-    }
 
-    // Fields
-    foreach ($arrSubmitted as $k=>$v)
-    {
-      if ($k != 'cc' && $k != 'id' && $k != 'FORM_SUBMIT' && $k != 'REQUEST_TOKEN')
-      {
-        $arrSet[$k] = $v;
-      }
-    }
-
-    // Files
-    if (!empty($_SESSION['FILES']))
-    {
-      foreach ($_SESSION['FILES'] as $k=>$v)
-      {
-        if ($v['uploaded'])
-        {
-          $arrSet[$k] = str_replace(TL_ROOT . '/', '', $v['tmp_name']);
+        //check if we should storeAndUpdate this form
+        //check if table and alias are set
+        if (intval($arrForm['storeAndUpdateValues']) != 1 &&
+            strlen($arrForm['storeAndUpdateTable']) == 0 &&
+            strlen($arrForm['storeAndUpdateAlias']) == 0
+        ) {
+            return;
         }
-      }
+
+        $table = $arrForm['storeAndUpdateTable'];
+        $alias = $arrForm['storeAndUpdateAlias'];
+
+        $this->import('FrontendUser', 'frontendUser');
+        $this->import('Database', 'database');
+
+        //check if table exists
+        if (!$this->database->tableExists($table, null, true)) {
+            $this->logError($form,
+                __METHOD__,
+                "Table ".$table." does not exist!");
+            return;
+        }
+
+        //read available database fields from db
+        $fieldList = $this->database->listFields($table, true);
+
+        $dbFields = array();
+        foreach ($fieldList as $field) {
+            $dbFields[$field['name']] = $field;
+        }
+
+        //check if alias field exists
+        if (!isset($dbFields[$alias])) {
+            $this->logError($form,
+                __METHOD__,
+                "Alias/id field:".$alias." in table ".$table." does not exist!");
+            return;
+        }
+
+        //check if we should insert or update
+        if ((is_string($arrSubmitted[$alias]) && strlen($arrSubmitted[$alias]) > 0) ||
+            (is_numeric($arrSubmitted[$alias]) && double_val($arrSubmitted[$alias]) > 0)
+        ) {
+
+            $aliasValue = (is_numeric($arrSubmitted[$alias]) ? intval($arrSubmitted[$alias]) : preg_replace("/[^a-zA-Z0-9\-]+/", "", $arrSubmitted[$alias]));
+
+            /**
+             * @var Database $database
+             */
+            $database = $this->database;
+
+            //check if we are allowed to update
+            if (!empty($arrForm["storeAndUpdateEditPermissionField"])) {
+
+                //check if permission field exists
+                if (!isset($dbFields[$arrForm["storeAndUpdateEditPermissionField"]])) {
+                    $this->logError($form,
+                        __METHOD__,
+                        "Permissionfield in table ".$table." does not exist!");
+                    return;
+                }
+
+                $sql = "SELECT " . $arrForm["storeAndUpdateEditPermissionField"] . " FROM " . $table . " WHERE " . $alias . " = " . $aliasValue;
+                $result = $database->query($sql);
+
+                $row = $result->fetchAssoc();
+                $editPermissions = deserialize($row[$arrForm["storeAndUpdateEditPermissionField"]]);
+
+                if ($editPermissions != null && !is_array($editPermissions)) {
+                    $this->logError($form,
+                        __METHOD__,
+                        "Permissionfield in table ".$table." is of wrong type!");
+                    return;
+                }
+
+                $userGroups = \contao\FrontendUser::getInstance()->groups;
+                $allowedGroups = deserialize($editPermissions);
+
+                $allowed = false;
+
+                if (is_array($userGroups) && is_array($allowedGroups)) {
+                    foreach ($userGroups as $userGroup) {
+                        if (in_array($userGroup, $allowedGroups)) {
+                            $allowed = true;
+                        }
+                    }
+                }
+
+                if (!$allowed) {
+                    $this->logError($form,
+                        __METHOD__,
+                        \contao\FrontendUser::getInstance()->username.
+                        " tries to update entry with id/alias:".$aliasValue." in table:".$table.
+                        ". Access not allowed!");
+                    return;
+                }
+            }
+
+            $this->update($table, $alias, $arrSubmitted, $alias,$arrForm, $arrFiles,$form);
+        } else {
+
+            $userGroups = \contao\FrontendUser::getInstance()->groups;
+            $allowedGroups = deserialize($arrForm['member_insert_groups']);
+
+            $allowed = false;
+
+            if (is_array($userGroups) && is_array($allowedGroups)) {
+                foreach ($userGroups as $userGroup) {
+                    if (in_array($userGroup, $allowedGroups)) {
+                        $allowed = true;
+                    }
+                }
+            }
+
+            if (!$allowed) {
+                $this->logError($form,
+                                __METHOD__,
+                                \contao\FrontendUser::getInstance()->username.
+                                " tries to insert new entry in table:".$table.
+                                ". Access not allowed!");
+                return;
+            }
+
+            $this->insert($table, $alias, $arrSubmitted,$arrForm, $arrFiles,$form);
+        }
+
+        $this->setFormRedirect($form);
     }
 
-    // HOOK: store form data callback
-    if (isset($GLOBALS['TL_HOOKS']['storeAndUpdateFormData']) && is_array($GLOBALS['TL_HOOKS']['storeFormData']))
-    {
-      foreach ($GLOBALS['TL_HOOKS']['storeAndUpdateFormData'] as $callback)
-      {
-        $this->import($callback[0]);
+    /**
+     * Redirect form to last page
+     *
+     * checks for referer and tries to map it on a pagemodel
+     *
+     * @param \Form $form
+     */
+    protected function setFormRedirect($form = null){
+
+        $lastPage = $this->getJumpToPage();
+
+        if($lastPage){
+            $form->setJumpToPage($lastPage);
+        }
+    }
+
+    public function saveCurrentPageToSession(\PageModel $objPage, \LayoutModel $objLayout, \PageRegular $objPageRegular){
+        $this->import('Session', 'session');
+
         /**
-        *  @var array  arrSet Values which will be inserted
-        *  @var String type Type of storage operation ('Insert' or Update)
-        *  @var String table Table to store data in
-        *  @var String alias Name of field to identifie one data item
-        *  @var array  arrSubmitted Submitted form data
-        *  @var array  arrForm formConfiguration
-        *  @var array  arrFiles uploaded files
-        **/
-        $arrSet = $this->$callback[0]->$callback[1]($arrSet,$type,$table,$alias,$arrSubmitted,$arrForm,$arrFiles);
-      }
+         * @var \Session $session
+         */
+        $session = $this->session;
+        $lastPageId = $this->getJumpToId();
+
+        if($lastPageId!=$objPage->id){
+            $session->set('lastPageId',$objPage->id);
+        }
     }
 
-    // Set the correct empty value (see #6284, #6373)
-    foreach ($arrSet as $k=>$v)
+    protected function getJumpToId(){
+        $this->import('Session', 'session');
+        return intval($this->session->get('jumpToPageId'));
+    }
+
+    protected function getJumpToPage(){
+        $pageId = $this->getJumpToId();
+
+        $page = null;
+        if($pageId>0){
+            $page = PageModel::findByIdOrAlias($pageId);
+        }
+
+        return $page;
+    }
+
+    protected function logError($form, $method,$message)
     {
-      if ($v === '')
-      {
-        $arrSet[$k] = \Widget::getEmptyValueByFieldType($GLOBALS['TL_DCA'][$table]['fields'][$k]['sql']);
-      }
+        $this->log('Form "' . $form->title . '" fails to save/insert data: ' . $message, $method, TL_ERROR);
     }
 
-    return $arrSet;
-  }
+    protected function prepareDataArray($arrSubmitted, $table, $alias, $type,$arrForm, $arrFiles,$form)
+    {
+        $arrSet = array();
+
+        // Add the timestamp
+        if ($this->Database->fieldExists('tstamp', $table)) {
+            $arrSet['tstamp'] = time();
+        }
+
+        // Fields
+        foreach ($arrSubmitted as $k => $v) {
+            if ($k != 'cc' && $k != 'id' && $k != 'FORM_SUBMIT' && $k != 'REQUEST_TOKEN') {
+                $arrSet[$k] = $v;
+            }
+        }
+
+        // Files
+        if (!empty($_SESSION['FILES'])) {
+            foreach ($_SESSION['FILES'] as $k => $v) {
+                if ($v['uploaded']) {
+                    $arrSet[$k] = str_replace(TL_ROOT . '/', '', $v['tmp_name']);
+                }
+            }
+        }
+
+        // HOOK: store form data callback
+        if (isset($GLOBALS['TL_HOOKS']['storeAndUpdateFormData']) && is_array($GLOBALS['TL_HOOKS']['storeFormData'])) {
+            foreach ($GLOBALS['TL_HOOKS']['storeAndUpdateFormData'] as $callback) {
+                $this->import($callback[0]);
+                /**
+                 * @var array  arrSet Values which will be inserted
+                 * @var String type Type of storage operation ('Insert' or Update)
+                 * @var String table Table to store data in
+                 * @var String alias Name of field to identifie one data item
+                 * @var array  arrSubmitted Submitted form data
+                 * @var array  arrForm formConfiguration
+                 *  @var array  arrFiles uploaded files
+                 **/
+                $arrSet = $this->$callback[0]->$callback[1]($arrSet, $type, $table, $alias, $arrSubmitted, $arrForm, $arrFiles,$form);
+            }
+        }
+
+        // Set the correct empty value (see #6284, #6373)
+        foreach ($arrSet as $k => $v) {
+            if ($v === '') {
+                $arrSet[$k] = \Widget::getEmptyValueByFieldType($GLOBALS['TL_DCA'][$table]['fields'][$k]['sql']);
+            }
+        }
+
+        return $arrSet;
+    }
 
 
-  protected function update($table,$alias,$arrSubmitted,$aliasFieldName){
-    $type   = 'UPDATE';
+    protected function update($table, $alias, $arrSubmitted, $aliasFieldName,$arrForm, $arrFiles,$form)
+    {
+        $type = 'UPDATE';
 
-    $arrSet = $this->prepareDataArray($arrSubmitted,$table,$alias,$type);
+        $arrSet = $this->prepareDataArray($arrSubmitted, $table, $alias, $type,$arrForm, $arrFiles,$form);
 
-    $this->Database
-         ->prepare('UPDATE '. $table .' %s WHERE '.$aliasFieldName.'=?')
-         ->set($arrSet)
-         ->execute($arrSubmitted[$aliasFieldName]);
+        $this->Database
+            ->prepare('UPDATE ' . $table . ' %s WHERE ' . $aliasFieldName . '=?')
+            ->set($arrSet)
+            ->execute($arrSubmitted[$aliasFieldName]);
 
-  }
+    }
 
-  protected function insert($table,$alias,$arrSubmitted){
-    $type   = 'INSERT';
+    protected function insert($table, $alias, $arrSubmitted,$arrForm, $arrFiles,$form)
+    {
+        $type = 'INSERT';
 
-    $arrSet = $this->prepareDataArray($arrSubmitted,$table,$alias,$type);
+        $arrSet = $this->prepareDataArray($arrSubmitted, $table, $alias, $type,$arrForm, $arrFiles,$form);
 
-    $this->Database->prepare("INSERT INTO " . $table . " %s")->set($arrSet)->execute();
-  }
+        $this->Database->prepare("INSERT INTO " . $table . " %s")->set($arrSet)->execute();
+    }
 
 
 }

@@ -34,6 +34,7 @@
  */
 ClassLoader::addClasses(array
 (
-    'jba\form\saveAndUpdate\FormSaveAndUpdateBackendProcessor'  => 'system/modules/FormInsertAndUpdate/classes/FormSaveAndUpdateBackendProcessor.php',
+    'Form'                                                       => 'system/modules/FormInsertAndUpdate/classes/core_replacement/Form.php',
+    'jba\form\saveAndUpdate\FormSaveAndUpdateBackendProcessor'   => 'system/modules/FormInsertAndUpdate/classes/FormSaveAndUpdateBackendProcessor.php',
     'jba\form\saveAndUpdate\FormSaveAndUpdateFrontendProcessor'  => 'system/modules/FormInsertAndUpdate/classes/FormSaveAndUpdateFrontendProcessor.php'
 ));
