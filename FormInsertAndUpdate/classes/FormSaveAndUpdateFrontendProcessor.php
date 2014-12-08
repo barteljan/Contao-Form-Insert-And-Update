@@ -125,25 +125,27 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend
                     return;
                 }
 
-                $userGroups = \contao\FrontendUser::getInstance()->groups;
                 $allowedGroups = deserialize($editPermissions);
 
-                $allowed = false;
-
-                if (is_array($userGroups) && is_array($allowedGroups)) {
-                    foreach ($userGroups as $userGroup) {
-                        if (in_array($userGroup, $allowedGroups)) {
+                if (isset($GLOBALS['TL_HOOKS']['checkFormUpdatePermissions']) &&
+                    is_array($GLOBALS['TL_HOOKS']['checkFormUpdatePermissions'])) {
+                    foreach ($GLOBALS['TL_HOOKS']['checkFormUpdatePermissions'] as $callback) {
+                        $this->import($callback[0]);
+                        /**
+                         * @var array list of member-group-ids which are allowed to access
+                         * @var array submitted form data
+                         * @var \Form submittef form object
+                         * @var String table name
+                         * @var String alias/id field name
+                         * @var mixed alias/id value
+                         **/
+                        if($this->$callback[0]->$callback[1]($allowedGroups, $arrSubmitted, $form, $table, $alias, $aliasValue)){
                             $allowed = true;
-                        }
+                        };
                     }
                 }
 
-                if (!$allowed) {
-                    $this->logError($form,
-                        __METHOD__,
-                        \contao\FrontendUser::getInstance()->username.
-                        " tries to update entry with id/alias:".$aliasValue." in table:".$table.
-                        ". Access not allowed!");
+                if(!$allowed){
                     return;
                 }
             }
@@ -151,33 +153,68 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend
             $this->update($table, $alias, $arrSubmitted, $alias,$arrForm, $arrFiles,$form);
         } else {
 
-            $userGroups = \contao\FrontendUser::getInstance()->groups;
             $allowedGroups = deserialize($arrForm['member_insert_groups']);
 
             $allowed = false;
+            $aliasValue = 0;
 
-            if (is_array($userGroups) && is_array($allowedGroups)) {
-                foreach ($userGroups as $userGroup) {
-                    if (in_array($userGroup, $allowedGroups)) {
+            if (isset($GLOBALS['TL_HOOKS']['checkFormInsertPermissions']) &&
+                is_array($GLOBALS['TL_HOOKS']['checkFormInsertPermissions'])) {
+                foreach ($GLOBALS['TL_HOOKS']['checkFormInsertPermissions'] as $callback) {
+                    $this->import($callback[0]);
+                    /**
+                     * @var array list of member-group-ids which are allowed to access
+                     * @var array submitted form data
+                     * @var \Form submittef form object
+                     * @var String table name
+                     * @var String alias/id field name
+                     * @var mixed alias/id value
+                     **/
+                    if($this->$callback[0]->$callback[1]($allowedGroups, $arrSubmitted, $form, $table, $alias, $aliasValue)){
                         $allowed = true;
-                    }
+                    };
                 }
             }
 
-            if (!$allowed) {
-                $this->logError($form,
-                                __METHOD__,
-                                \contao\FrontendUser::getInstance()->username.
-                                " tries to insert new entry in table:".$table.
-                                ". Access not allowed!");
+            if(!$allowed){
                 return;
             }
+
 
             $this->insert($table, $alias, $arrSubmitted,$arrForm, $arrFiles,$form);
         }
 
         $this->setFormRedirect($form);
     }
+
+
+    public function checkIfUserContainsToGroups($allowedGroupIds,$arrSubmitted,$form,$table,$alias,$aliasValue){
+
+        $allowed = false;
+
+        $userGroups = \contao\FrontendUser::getInstance()->groups;
+
+        if (is_array($userGroups) && is_array($allowedGroupIds)) {
+            foreach ($userGroups as $userGroup) {
+                if (in_array($userGroup, $allowedGroupIds)) {
+                    $allowed = true;
+                }
+            }
+        }
+
+        if (!$allowed) {
+            $this->logError($form,
+                __METHOD__,
+                \contao\FrontendUser::getInstance()->username.
+                " tries to ".empty($aliasValue)?"insert":"update"." entry with id/alias:".$aliasValue." in table:".$table.
+                    ". Access not allowed!");
+            return false;
+        }
+
+        return true;
+    }
+
+
 
     /**
      * Redirect form to last page
@@ -192,20 +229,6 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend
 
         if($lastPage){
             $form->setJumpToPage($lastPage);
-        }
-    }
-
-    public function saveCurrentPageToSession(\PageModel $objPage, \LayoutModel $objLayout, \PageRegular $objPageRegular){
-        $this->import('Session', 'session');
-
-        /**
-         * @var \Session $session
-         */
-        $session = $this->session;
-        $lastPageId = $this->getJumpToId();
-
-        if($lastPageId!=$objPage->id){
-            $session->set('lastPageId',$objPage->id);
         }
     }
 
@@ -256,7 +279,8 @@ class FormSaveAndUpdateFrontendProcessor extends \Frontend
         }
 
         // HOOK: store form data callback
-        if (isset($GLOBALS['TL_HOOKS']['storeAndUpdateFormData']) && is_array($GLOBALS['TL_HOOKS']['storeFormData'])) {
+        if (isset($GLOBALS['TL_HOOKS']['storeAndUpdateFormData']) &&
+            is_array($GLOBALS['TL_HOOKS']['storeFormData'])) {
             foreach ($GLOBALS['TL_HOOKS']['storeAndUpdateFormData'] as $callback) {
                 $this->import($callback[0]);
                 /**

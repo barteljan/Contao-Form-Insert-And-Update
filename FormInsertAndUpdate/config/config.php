@@ -30,4 +30,5 @@
  * @copyright Jan Bartel 2014
  */
 $GLOBALS['TL_HOOKS']['processFormData'][] = array('jba\form\saveAndUpdate\FormSaveAndUpdateFrontendProcessor', 'processSubmittedData');
-$GLOBALS['TL_HOOKS']['generatePage'][] = array('jba\form\saveAndUpdate\FormSaveAndUpdateFrontendProcessor', 'saveCurrentPageToSession');
+$GLOBALS['TL_HOOKS']['checkFormInsertPermissions'][] = array('jba\form\saveAndUpdate\FormSaveAndUpdateFrontendProcessor', 'checkIfUserContainsToGroups');
+$GLOBALS['TL_HOOKS']['checkFormUpdatePermissions'][] = array('jba\form\saveAndUpdate\FormSaveAndUpdateFrontendProcessor', 'checkIfUserContainsToGroups');
